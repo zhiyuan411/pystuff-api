@@ -142,14 +142,38 @@ def proxy_request():
             debug_output = [
                 f"代理请求URL: {raw_url}",
                 f"请求方法: {request_method}",
-                f"响应状态码: {resp.status_code}",
-                "\n响应头:"
+                "\n请求头:",
             ]
+            # 添加请求头信息
+            for k, v in headers.items():
+                debug_output.append(f"  {k}: {v}")
+            
+            # 添加查询字符串参数
+            if request.args:
+                debug_output.append("\n查询字符串参数:")
+                for k, v in request.args.items():
+                    debug_output.append(f"  {k}: {v}")
+            
+            # 添加表单数据/请求载荷
+            if request_method == 'POST':
+                debug_output.append("\n请求载荷:")
+                if json_data:
+                    for k, v in json_data.items():
+                        debug_output.append(f"  {k}: {v}")
+                elif data:
+                    for k, v in data.items():
+                        debug_output.append(f"  {k}: {v}")
+            
+            # 添加响应信息
+            debug_output.extend([
+                f"\n响应状态码: {resp.status_code}",
+                "\n响应头:"
+            ])
             for k, v in resp.headers.items():
                 debug_output.append(f"  {k}: {v}")
             debug_output.append("\n响应内容:")
             debug_output.append(resp.text)
-            
+
             # 返回纯文本调试信息
             return Response("\n".join(debug_output), mimetype='text/plain')
 
@@ -187,7 +211,16 @@ def proxy_request():
             # 调试模式下详细显示错误信息
             error_text = f"代理请求失败: {str(e)}\n"
             error_text += f"请求URL: {raw_url}\n"
-            error_text += f"请求方法: {request_method}"
+            error_text += f"请求方法: {request_method}\n"
+            # 添加错误情况下的请求头信息
+            error_text += "请求头:\n"
+            for k, v in headers.items():
+                error_text += f"  {k}: {v}\n"
+            # 添加错误情况下的请求参数信息
+            if request.args:
+                error_text += "查询字符串参数:\n"
+                for k, v in request.args.items():
+                    error_text += f"  {k}: {v}\n"
             return Response(error_text, mimetype='text/plain', status=502)
         else:
             return f"代理请求失败: {str(e)}", 502
