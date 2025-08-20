@@ -1,13 +1,15 @@
 #! env python
 # -*- coding: utf-8 -*-
  
-from flask import Flask, request, session, Response, send_file, abort
+from flask import Flask, request, session, Response, send_file, abort, jsonify
 from urllib.parse import urlparse, unquote
+from user_agents import parse  # 需要安装：suod pip3 install user-agents
 import os
 import datetime
 import re
 import base64
 import requests
+import json
  
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -18,6 +20,43 @@ app.debug = True
 @app.route('/')
 def hello_world():
     return '<h1 style="color: green;">你好，flask!</h1>'
+
+@app.route('/request-headers.do', methods=['GET'])
+def handle_request_headers():
+    """处理请求头信息，返回JSON格式的头信息及解析内容"""
+    # 获取所有请求头
+    headers = dict(request.headers)
+    
+    # 解析User-Agent信息
+    user_agent = headers.get('User-Agent', '')
+    ua = parse(user_agent) if user_agent else None
+    
+    # 构建包含解析的响应数据
+    response_data = {
+        'raw_headers': headers,
+        'parsed_info': {}
+    }
+    
+    # 提取解析后的用户代理信息（使用中文key便于浏览器直接展示）
+    if ua:
+        response_data['parsed_info'] = {
+            '浏览器': ua.browser.family,
+            '浏览器版本': f"{ua.browser.version_string}",
+            '操作系统': ua.os.family,
+            '操作系统版本': f"{ua.os.version_string}",
+            '设备': ua.device.family,
+            '是否移动设备': ua.is_mobile,
+            '是否平板设备': ua.is_tablet,
+            '是否桌面设备': ua.is_pc,
+            '是否爬虫': ua.is_bot
+        }
+    
+    # 打印到控制台（以JSON格式）
+    print("Received request headers:")
+    print(json.dumps(response_data, ensure_ascii=False, indent=2))
+    
+    # 返回JSON响应
+    return jsonify(response_data)
 
 @app.route('/get-ieee-oui.do', methods=['GET'])
 def get_ieee_oui():
