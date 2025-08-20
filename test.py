@@ -1,8 +1,10 @@
 #! env python
 # -*- coding: utf-8 -*-
  
-from flask import Flask, request, session, Response
+from flask import Flask, request, session, Response, send_file, abort
 from urllib.parse import urlparse, unquote
+import os
+import datetime
 import re
 import base64
 import requests
@@ -16,6 +18,45 @@ app.debug = True
 @app.route('/')
 def hello_world():
     return '<h1 style="color: green;">你好，flask!</h1>'
+
+@app.route('/get-ieee-oui.do', methods=['GET'])
+def get_ieee_oui():
+    file_path = '/var/www/python/cache/oui.txt'
+    
+    # 检查文件是否存在或是否需要更新
+    if not os.path.exists(file_path):
+        # 文件不存在，尝试同步下载
+        download_oui(file_path)
+    else:
+        # 检查文件是否过期（7天）
+        file_time = datetime.datetime.fromtimestamp(os.path.getmtime(file_path))
+        if datetime.datetime.now() - file_time > datetime.timedelta(days=7):
+            # 后台异步更新（不阻塞当前请求）
+            import threading
+            threading.Thread(target=download_oui, args=(file_path,), daemon=True).start()
+    
+    # 返回文件内容或错误
+    if os.path.exists(file_path):
+        # 以文本形式返回，设置正确的Content-Type
+        return send_file(
+            file_path,
+            mimetype='text/plain',
+            as_attachment=False
+        )
+    else:
+        return abort(503, description="OUI file unavailable and download failed")
+
+def download_oui(file_path):
+    """下载或更新OUI文件的函数"""
+    try:
+        # 确保目录存在
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        # 执行wget命令（-q静默模式，-O输出文件）
+        os.system(f'wget -q -O {file_path} https://standards-oui.ieee.org/oui/oui.txt')
+        # 记录更新日志
+        print(f"{datetime.datetime.now()} Updated {file_path}\n", flush=True)
+    except Exception as e:
+        print(f'OUI download failed: {str(e)}', flush=True)
 
 @app.route('/proxy.do', methods=['GET', 'POST'])
 def proxy_request():
